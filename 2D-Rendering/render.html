@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>HTML Canvas 2D</title>
+        <link rel="stylesheet" href="render.css">
+    </head>
+    <body>
+        <canvas id="canvas" />
+
+        <script>
+            const Landscape = function (context, width, height) {
+                this.offset = 0;
+                this.width = width;
+                this.advance = function (dx) {
+                    this.offset += dx;
+                }
+                this.horizon = height * 0.7;
+                // sky gradient
+                this.sky = context.createLinearGradient(0, 0, 0, this.horizon);
+                this.sky.addColorStop(0.0, '#F13F6D');
+                this.sky.addColorStop(0.7, '#1DB7BA');
+                this.sky.addColorStop(1.0, '#ACDB6B');
+                // ground gradient
+                this.ground = context.createLinearGradient(0, this.horizon, 0, height);
+                this.ground.addColorStop(0.0, '#54595F');
+                this.ground.addColorStop(1.0, '#7A7A7A');
+                // draw the sky and ground
+                this.paintBackground = function (context, width, height) {
+                    context.fillStyle = this.sky;
+                    context.fillRect(0, 0, width, this.horizon);
+                    context.fillStyle = this.ground;
+                    context.fillRect(0, this.horizon, width, height-this.horizon);
+                    // draw cloudy banner  
+                    context.save();
+                    context.translate(width-((this.offset+(this.width*3.2)) % (this.width*4.0))+0, 0);
+                    context.shadowColor = 'white';
+                    context.shadowOffsetY = 30+this.horizon/3; 
+                    context.shadowBlur = '5';
+                    context.fillStyle = 'white';
+                    context.textAlign = 'left';
+                    context.Baseline = 'top';
+                    context.font = 'bold 40px Roboto';
+                    context.fillText('devSanAntonio', 10, -30);
+                    context.restore();
+                    // draw background tree
+                    context.save();
+                    context.translate(width-((this.offset+(this.width*0.2)) % (this.width*1.5))+30, 0);
+                    context.beginPath();
+                    context.fillStyle = '#F89225';
+                    context.lineStyle = '#F4F4F4';
+                    context.lineWidth = 2;
+                    context.rect(0, this.horizon+5, 10, -50); // trunk
+                    context.fill();
+                    context.stroke();
+                    context.beginPath();
+                    context.fillStyle = '#FACB11';
+                    context.arc(5, this.horizon-60, 30, 0, Math.PI*2); // leaves
+                    context.fill();
+                    context.stroke();
+                    context.restore();
+                }
+                // draw the foreground
+                this.paintForeground = function (context, width, height) {
+                    // box in front 
+                    context.save();
+                    context.translate(width-((this.offset+(this.width*0.7)) % (this.width*1.1))+0, 0);
+                    context.beginPath();
+                    context.rect(0, this.horizon - 5, 25, 25);
+                    context.fillStyle = '#F13F6D';
+                    context.lineStyle = '#F4F4F4'; 
+                    context.lineWidth = 2;
+                    context.fill();
+                    context.stroke();
+                    context.restore();
+                }
+            }
+        </script>
+        <script>
+            // the bike
+            const TheHuman = function () {
+                this.sprites = new Image();
+                this.sprites.src = 'alien.png';
+                this.targetMode = 'idle';
+
+                this.walk = function () {
+                    this.targetMode = 'walk';
+                }
+
+                this.stop = function () {
+                    this.targetMode = 'idle';
+                }
+
+                this.frameIndex = {
+                    'idle': [0],
+                    'walk': [1, 2, 3, 4, 5, 6],
+                    'stop': [7],
+                }
+
+                this.mode = 'idle';
+                this.frame = 0;
+
+                this.tick = function() {
+                    this.frame += 1;
+                    if (this.frame >= this.frameIndex[this.mode].length) {
+                        this.frame = 0;
+                    
+                        if (this.mode != this.targetMode) {
+                            if (this.mode === 'walk') {
+                                this.mode = 'stop';
+
+                            } else if (this.mode === 'stop') {
+                                if (this.targetMode === 'walk') 
+                                    this.mode = 'walk';
+                                else 
+                                    this.mode = 'idle';
+
+                            } else if (this.mode === 'idle') {
+                                if (this.targetMode === 'walk') 
+                                    this.mode = 'walk';
+                            }
+                        }
+                    }
+                }
+                if (this.mode === 'walk') {
+                    return 8;
+                    return 0;
+                }
+                this.paint = function (context, x, y) {
+                    if (!this.sprites.complete) return;
+
+                    context.drawImage(
+                        this.sprites,
+                        this.frameIndex[this.mode][this.frame] * this.sprites.height,
+                        0,
+                        this.sprites.height,
+                        this.sprites.height,
+                        x-this.sprites.height/2,
+                        y-this.sprites.height,
+                        this.sprites.height,
+                        this.sprites.height
+                    );
+                }
+            }
+        </script>
+        <script>
+            const canvas = document.getElementById('canvas');
+            const context = canvas.getContext('2d');
+
+            function resizeCanvas() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+
+            const landscape = new Landscape(context, canvas.width, canvas.height);
+            const human = new TheHuman();
+
+            function paint() {
+                context.clearRect(0, 0, canvas.width, canvas.height);
+                landscape.paintBackground(context, canvas.width, canvas.height);
+                human.paint(context, canvas.width/2, landscape.horizon*1.1);
+                landscape.paintForeground(context, canvas.width, canvas.height);
+                requestAnimationFrame(paint);
+            }
+            paint();
+
+            setInterval (function () {
+                let dx = human.tick();
+                landscape.advance(dx);
+            }, 100);
+
+            window.addEventListener('click', function (event) {
+                human.walk();
+            });
+            window.addEventListener('dblclick', function (event) {
+                human.stop();
+            });
+        </script>
+    </body>
+</html>
